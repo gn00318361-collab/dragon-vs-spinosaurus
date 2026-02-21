@@ -2,35 +2,139 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <title>噴火龍和紅色棘龍</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body {
+html, body {
   background: #87CEEB;
   overflow: hidden;
   touch-action: none;
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overscroll-behavior: none;
 }
 canvas {
   display: block;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0; left: 0;
+}
+#fullscreenBtn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.8);
+  background: rgba(0,0,0,0.25);
+  color: white;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(4px);
+}
+#fullscreenBtn:active { transform: scale(0.9); }
+#orientHint {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+}
+#orientHint .icon { font-size: 80px; animation: rotateHint 2s infinite; }
+@keyframes rotateHint {
+  0%,100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
 }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<button id="fullscreenBtn" aria-label="全螢幕">⛶</button>
+<div id="orientHint">
+  <div class="icon">📱</div>
+  <p style="margin-top:20px">請橫放平板玩喔！</p>
+</div>
+
 <script>
+// ============ PREVENT ALL UNWANTED TOUCH ============
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+// Prevent Safari pull-to-refresh & swipe back
+window.addEventListener('touchstart', e => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
+// ============ FULLSCREEN ============
+const fsBtn = document.getElementById('fullscreenBtn');
+fsBtn.addEventListener('click', () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    try { screen.orientation.lock('landscape').catch(()=>{}); } catch(e) {}
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }
+});
+// Update button icon
+function updateFsBtn() {
+  fsBtn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '✕' : '⛶';
+}
+document.addEventListener('fullscreenchange', updateFsBtn);
+document.addEventListener('webkitfullscreenchange', updateFsBtn);
+
+// ============ ORIENTATION HINT ============
+function checkOrientation() {
+  const hint = document.getElementById('orientHint');
+  if (window.innerHeight > window.innerWidth && window.innerWidth < 600) {
+    hint.style.display = 'flex';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+window.addEventListener('resize', checkOrientation);
+checkOrientation();
+
+// ============ CANVAS SETUP ============
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 let W, H;
 
 function resize() {
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 resize();
 window.addEventListener('resize', resize);
@@ -49,52 +153,46 @@ function playSound(type) {
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(300, now);
     osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
-    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-    osc.start(now);
-    osc.stop(now + 0.4);
+    osc.start(now); osc.stop(now + 0.4);
   } else if (type === 'roar') {
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(120, now);
     osc.frequency.exponentialRampToValueAtTime(80, now + 0.5);
-    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-    osc.start(now);
-    osc.stop(now + 0.5);
+    osc.start(now); osc.stop(now + 0.5);
   } else if (type === 'pop') {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(800 + Math.random() * 600, now);
     osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
-    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.setValueAtTime(0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    osc.start(now);
-    osc.stop(now + 0.15);
+    osc.start(now); osc.stop(now + 0.15);
   } else if (type === 'eat') {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(400, now);
     osc.frequency.setValueAtTime(600, now + 0.08);
     osc.frequency.setValueAtTime(800, now + 0.16);
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    osc.start(now);
-    osc.stop(now + 0.25);
+    osc.start(now); osc.stop(now + 0.25);
   } else if (type === 'happy') {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(523, now);
     osc.frequency.setValueAtTime(659, now + 0.1);
     osc.frequency.setValueAtTime(784, now + 0.2);
-    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.setValueAtTime(0.12, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-    osc.start(now);
-    osc.stop(now + 0.35);
+    osc.start(now); osc.stop(now + 0.35);
   } else if (type === 'bounce') {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(500, now);
     osc.frequency.exponentialRampToValueAtTime(900, now + 0.1);
-    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.setValueAtTime(0.1, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    osc.start(now);
-    osc.stop(now + 0.15);
+    osc.start(now); osc.stop(now + 0.15);
   }
 }
 
@@ -107,16 +205,12 @@ function spawnStars(x, y, count) {
     const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
     const speed = 3 + Math.random() * 5;
     particles.push({
-      type: 'star',
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 2,
-      size: 10 + Math.random() * 15,
+      type: 'star', x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
+      size: 12 + Math.random() * 18,
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      life: 60 + Math.random() * 30,
-      maxLife: 90,
-      rot: Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.2
+      life: 60 + Math.random() * 30, maxLife: 90,
+      rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.2
     });
   }
 }
@@ -125,15 +219,11 @@ function spawnHearts(x, y, count) {
   for (let i = 0; i < count; i++) {
     particles.push({
       type: 'heart',
-      x: x + (Math.random() - 0.5) * 40,
-      y,
-      vx: (Math.random() - 0.5) * 3,
-      vy: -3 - Math.random() * 4,
-      size: 15 + Math.random() * 15,
+      x: x + (Math.random() - 0.5) * 50, y,
+      vx: (Math.random() - 0.5) * 3, vy: -3 - Math.random() * 4,
+      size: 18 + Math.random() * 18,
       color: ['#FF69B4','#FF1493','#FF6B6B','#E91E63'][Math.floor(Math.random() * 4)],
-      life: 60 + Math.random() * 30,
-      maxLife: 90,
-      rot: 0, rotSpeed: 0
+      life: 60 + Math.random() * 30, maxLife: 90, rot: 0, rotSpeed: 0
     });
   }
 }
@@ -143,13 +233,10 @@ function spawnFire(x, y, dir, count) {
     particles.push({
       type: 'circle',
       x, y: y + (Math.random() - 0.5) * 20,
-      vx: dir * (4 + Math.random() * 8),
-      vy: (Math.random() - 0.5) * 4,
-      size: 8 + Math.random() * 18,
+      vx: dir * (4 + Math.random() * 8), vy: (Math.random() - 0.5) * 4,
+      size: 10 + Math.random() * 20,
       color: ['#FFDD57','#FF6B35','#FF3D00','#FFE082','#FFF176'][Math.floor(Math.random() * 5)],
-      life: 20 + Math.random() * 20,
-      maxLife: 40,
-      rot: 0, rotSpeed: 0
+      life: 20 + Math.random() * 20, maxLife: 40, rot: 0, rotSpeed: 0
     });
   }
 }
@@ -158,15 +245,11 @@ function spawnBubbles(x, y, count) {
   for (let i = 0; i < count; i++) {
     particles.push({
       type: 'bubble',
-      x: x + (Math.random() - 0.5) * 60,
-      y,
-      vx: (Math.random() - 0.5) * 2,
-      vy: -1 - Math.random() * 3,
-      size: 10 + Math.random() * 25,
+      x: x + (Math.random() - 0.5) * 60, y,
+      vx: (Math.random() - 0.5) * 2, vy: -1 - Math.random() * 3,
+      size: 12 + Math.random() * 28,
       color: ['#67E8F9','#A5F3FC','#BAE6FD','#E0F2FE','#C084FC'][Math.floor(Math.random() * 5)],
-      life: 80 + Math.random() * 40,
-      maxLife: 120,
-      rot: 0, rotSpeed: 0
+      life: 80 + Math.random() * 40, maxLife: 120, rot: 0, rotSpeed: 0
     });
   }
 }
@@ -176,16 +259,12 @@ function spawnConfetti(x, y, count) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 2 + Math.random() * 6;
     particles.push({
-      type: 'rect',
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 3,
-      size: 6 + Math.random() * 8,
+      type: 'rect', x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 3,
+      size: 7 + Math.random() * 10,
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      life: 60 + Math.random() * 40,
-      maxLife: 100,
-      rot: Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.3
+      life: 60 + Math.random() * 40, maxLife: 100,
+      rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.3
     });
   }
 }
@@ -200,19 +279,22 @@ const FOOD_TYPES = [
   { emoji: '🥩', name: 'steak' },
   { emoji: '🍎', name: 'apple' },
   { emoji: '🧁', name: 'cupcake' },
+  { emoji: '🍰', name: 'cake' },
+  { emoji: '🍕', name: 'pizza' },
 ];
 
 function spawnFood() {
   const type = FOOD_TYPES[Math.floor(Math.random() * FOOD_TYPES.length)];
   foods.push({
-    x: 100 + Math.random() * (W - 200),
-    y: -40,
-    vy: 1 + Math.random() * 1.5,
-    size: 40 + Math.random() * 15,
+    x: 80 + Math.random() * (W - 160),
+    y: -60,
+    vy: 1.5 + Math.random() * 1.5,
+    size: 55 + Math.random() * 20, // bigger for tablet!
     emoji: type.emoji,
     rot: 0,
     rotSpeed: (Math.random() - 0.5) * 0.05,
-    bounce: 0
+    bounce: 0,
+    glow: 0 // glow animation to attract attention
   });
 }
 
@@ -220,7 +302,7 @@ function spawnFood() {
 let clouds = [];
 for (let i = 0; i < 6; i++) {
   clouds.push({
-    x: Math.random() * W * 1.5 - W * 0.25,
+    x: Math.random() * 2000 - 200,
     y: 30 + Math.random() * 120,
     w: 100 + Math.random() * 120,
     speed: 0.2 + Math.random() * 0.4
@@ -241,13 +323,14 @@ const dragon = {
   scale: 1, baseScale: 1,
   facing: 1,
   animTime: 0,
-  state: 'idle', // idle, walking, fire, happy, jump, eat
+  state: 'idle',
   stateTimer: 0,
   moveTimer: 0,
   jumpVy: 0,
   baseY: 0,
   squish: 1,
-  fatness: 1  // 1 = normal, gets bigger when eating
+  fatness: 1,
+  eatTarget: null // food object to walk towards
 };
 
 const spino = {
@@ -262,24 +345,24 @@ const spino = {
   jumpVy: 0,
   baseY: 0,
   squish: 1,
-  fatness: 1
+  fatness: 1,
+  eatTarget: null
 };
 
 function initPositions() {
-  const groundY = H * 0.72;
+  const groundY = H * 0.70;
   dragon.x = W * 0.25;
   dragon.y = groundY;
   dragon.baseY = groundY;
   dragon.targetX = dragon.x;
-  dragon.targetY = groundY;
-  dragon.baseScale = Math.min(W, H) / 700;
+  // Bigger scale for tablet
+  dragon.baseScale = Math.min(W, H) / 550;
 
   spino.x = W * 0.75;
   spino.y = groundY;
   spino.baseY = groundY;
   spino.targetX = spino.x;
-  spino.targetY = groundY;
-  spino.baseScale = Math.min(W, H) / 700;
+  spino.baseScale = Math.min(W, H) / 550;
 }
 initPositions();
 window.addEventListener('resize', initPositions);
@@ -295,9 +378,7 @@ function drawCuteDragon(d) {
   ctx.translate(d.x, d.y);
   const s = d.baseScale * d.scale;
   ctx.scale(s * d.facing, s);
-  // squish effect
   ctx.scale(1 / d.squish, d.squish);
-  // fatness effect - wider and taller when well-fed!
   const fatW = 1 + (d.fatness - 1) * 1.4;
   const fatH = 1 + (d.fatness - 1) * 1.0;
   ctx.scale(fatW, fatH);
@@ -314,7 +395,6 @@ function drawCuteDragon(d) {
   ctx.quadraticCurveTo(-40, -5 + bob, -15, -5 + bob);
   ctx.closePath();
   ctx.fill();
-  // Wing inner
   ctx.fillStyle = '#FFCC80';
   ctx.beginPath();
   ctx.moveTo(-15, -18 + bob);
@@ -332,7 +412,6 @@ function drawCuteDragon(d) {
   ctx.moveTo(-35, 10 + bob);
   ctx.quadraticCurveTo(-60, 5 + bob + tailWag, -75, -10 + bob + tailWag);
   ctx.stroke();
-  // tail tip
   ctx.fillStyle = '#FF6B35';
   ctx.beginPath();
   ctx.moveTo(-75, -10 + bob + tailWag);
@@ -356,14 +435,12 @@ function drawCuteDragon(d) {
   // Legs
   const legAnim = d.state === 'walking' ? Math.sin(t * 10) * 8 : 0;
   ctx.fillStyle = '#FF8C42';
-  // back legs
   ctx.beginPath();
   ctx.ellipse(-15, 30 + bob + legAnim, 10, 12, 0.1, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
   ctx.ellipse(10, 30 + bob - legAnim, 10, 12, -0.1, 0, Math.PI * 2);
   ctx.fill();
-  // feet
   ctx.fillStyle = '#FFB347';
   ctx.beginPath();
   ctx.ellipse(-15, 38 + bob + legAnim, 12, 6, 0, 0, Math.PI * 2);
@@ -378,7 +455,7 @@ function drawCuteDragon(d) {
   ctx.ellipse(35, -18 + bob, 24, 22, 0.15, 0, Math.PI * 2);
   ctx.fill();
 
-  // Cheeks (blush)
+  // Cheeks
   ctx.fillStyle = 'rgba(255,100,100,0.35)';
   ctx.beginPath();
   ctx.ellipse(48, -8 + bob, 10, 7, 0, 0, Math.PI * 2);
@@ -402,19 +479,16 @@ function drawCuteDragon(d) {
   ctx.ellipse(58, -11 + bob, 3, 2.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eyes (big cute eyes!)
-  // Eye white
+  // Eyes
   ctx.fillStyle = '#FFF';
   ctx.beginPath();
   ctx.ellipse(40, -24 + bob, 10, 11, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Pupil
   const blink = (Math.sin(t * 0.8) > 0.95) ? 0.2 : 1;
   ctx.fillStyle = '#2D1B00';
   ctx.beginPath();
   ctx.ellipse(42, -24 + bob, 6, 7 * blink, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Eye shine
   if (blink > 0.5) {
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
@@ -422,60 +496,38 @@ function drawCuteDragon(d) {
     ctx.fill();
   }
 
-  // Horns (cute small)
+  // Horns
   ctx.fillStyle = '#FFD166';
   ctx.beginPath();
-  ctx.moveTo(28, -38 + bob);
-  ctx.lineTo(24, -52 + bob);
-  ctx.lineTo(32, -36 + bob);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(28, -38 + bob); ctx.lineTo(24, -52 + bob); ctx.lineTo(32, -36 + bob);
+  ctx.closePath(); ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(38, -36 + bob);
-  ctx.lineTo(38, -50 + bob);
-  ctx.lineTo(44, -34 + bob);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(38, -36 + bob); ctx.lineTo(38, -50 + bob); ctx.lineTo(44, -34 + bob);
+  ctx.closePath(); ctx.fill();
 
   // Mouth
   if (d.state === 'happy' || d.state === 'eat') {
-    // Big smile
-    ctx.strokeStyle = '#C0392B';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(50, -10 + bob, 8, 0.1, Math.PI - 0.1);
-    ctx.stroke();
+    ctx.strokeStyle = '#C0392B'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(50, -10 + bob, 8, 0.1, Math.PI - 0.1); ctx.stroke();
   } else if (d.state === 'fire') {
-    // Open mouth
     ctx.fillStyle = '#C0392B';
-    ctx.beginPath();
-    ctx.ellipse(55, -10 + bob, 7, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(55, -10 + bob, 7, 6, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#FF6B35';
-    ctx.beginPath();
-    ctx.ellipse(55, -10 + bob, 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(55, -10 + bob, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
   } else {
-    // Small smile
-    ctx.strokeStyle = '#C0392B';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(50, -12 + bob, 5, 0.2, Math.PI - 0.2);
-    ctx.stroke();
+    ctx.strokeStyle = '#C0392B'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(50, -12 + bob, 5, 0.2, Math.PI - 0.2); ctx.stroke();
   }
 
   // Fire breath
   if (d.state === 'fire' && d.stateTimer > 10) {
-    const fireLen = (1 - d.stateTimer / 50) * 150;
     for (let i = 0; i < 5; i++) {
       const fx = 60 + i * 20;
       const fy = -10 + bob + Math.sin(t * 15 + i) * 8;
       const fs = (15 - i * 2) * (1 + Math.sin(t * 20) * 0.3);
       ctx.globalAlpha = 0.7 - i * 0.12;
       ctx.fillStyle = ['#FFF176','#FFEE58','#FFB300','#FF6D00','#DD2C00'][i];
-      ctx.beginPath();
-      ctx.arc(fx, fy, fs, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(fx, fy, fs, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -490,7 +542,6 @@ function drawCuteSpino(sp) {
   const s = sp.baseScale * sp.scale;
   ctx.scale(s * sp.facing, s);
   ctx.scale(1 / sp.squish, sp.squish);
-  // fatness effect - wider and taller when well-fed!
   const fatW = 1 + (sp.fatness - 1) * 1.4;
   const fatH = 1 + (sp.fatness - 1) * 1.0;
   ctx.scale(fatW, fatH);
@@ -500,19 +551,15 @@ function drawCuteSpino(sp) {
 
   // Tail
   const tailWag = sp.state === 'happy' ? Math.sin(t * 10) * 20 : Math.sin(t * 2.5) * 10;
-  ctx.strokeStyle = '#E53935';
-  ctx.lineWidth = 12;
-  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#E53935'; ctx.lineWidth = 12; ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-38, 8 + bob);
   ctx.quadraticCurveTo(-65, 2 + bob + tailWag, -85, -12 + bob + tailWag);
   ctx.stroke();
   ctx.fillStyle = '#FF5252';
-  ctx.beginPath();
-  ctx.arc(-85, -12 + bob + tailWag, 7, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(-85, -12 + bob + tailWag, 7, 0, Math.PI * 2); ctx.fill();
 
-  // Sail (big and colorful!)
+  // Sail
   const sailWave = Math.sin(t * 3) * 3;
   ctx.fillStyle = '#FF1744';
   ctx.beginPath();
@@ -520,129 +567,80 @@ function drawCuteSpino(sp) {
   ctx.quadraticCurveTo(-20, -60 + bob + sailWave, -5, -68 + bob + sailWave);
   ctx.quadraticCurveTo(10, -60 + bob + sailWave, 15, -50 + bob + sailWave);
   ctx.quadraticCurveTo(22, -5 + bob, 20, -5 + bob);
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath(); ctx.fill();
 
-  // Sail stripes
   ctx.fillStyle = '#FF5252';
   ctx.beginPath();
   ctx.moveTo(-18, -10 + bob);
   ctx.quadraticCurveTo(-15, -50 + bob + sailWave, -3, -56 + bob + sailWave);
   ctx.quadraticCurveTo(8, -48 + bob + sailWave, 12, -40 + bob + sailWave);
   ctx.quadraticCurveTo(16, -10 + bob, 15, -10 + bob);
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath(); ctx.fill();
 
-  // Sail dots (cute pattern)
   ctx.fillStyle = '#FF8A80';
   for (let i = 0; i < 4; i++) {
-    const dx = -10 + i * 8;
-    const dy = -30 - Math.sin(i * 0.8) * 15 + bob + sailWave;
-    ctx.beginPath();
-    ctx.arc(dx, dy, 3, 0, Math.PI * 2);
-    ctx.fill();
+    const dx = -10 + i * 8, dy = -30 - Math.sin(i * 0.8) * 15 + bob + sailWave;
+    ctx.beginPath(); ctx.arc(dx, dy, 3, 0, Math.PI * 2); ctx.fill();
   }
 
   // Body
   ctx.fillStyle = '#E53935';
-  ctx.beginPath();
-  ctx.ellipse(0, 8 + bob, 42, 26, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 8 + bob, 42, 26, 0, 0, Math.PI * 2); ctx.fill();
 
   // Belly
   ctx.fillStyle = '#FFCDD2';
-  ctx.beginPath();
-  ctx.ellipse(5, 16 + bob, 25, 16, 0, 0, Math.PI);
-  ctx.fill();
-
-  // Belly spots (cute)
+  ctx.beginPath(); ctx.ellipse(5, 16 + bob, 25, 16, 0, 0, Math.PI); ctx.fill();
   ctx.fillStyle = '#EF9A9A';
-  ctx.beginPath();
-  ctx.arc(-5, 18 + bob, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(8, 20 + bob, 3, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(-5, 18 + bob, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(8, 20 + bob, 3, 0, Math.PI * 2); ctx.fill();
 
   // Legs
   const legAnim = sp.state === 'walking' ? Math.sin(t * 9) * 8 : 0;
   ctx.fillStyle = '#E53935';
-  ctx.beginPath();
-  ctx.ellipse(-15, 32 + bob + legAnim, 11, 14, 0.1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(12, 32 + bob - legAnim, 11, 14, -0.1, 0, Math.PI * 2);
-  ctx.fill();
-  // Feet
+  ctx.beginPath(); ctx.ellipse(-15, 32 + bob + legAnim, 11, 14, 0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(12, 32 + bob - legAnim, 11, 14, -0.1, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#EF5350';
-  ctx.beginPath();
-  ctx.ellipse(-15, 42 + bob + legAnim, 14, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(12, 42 + bob - legAnim, 14, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-15, 42 + bob + legAnim, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(12, 42 + bob - legAnim, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Arms (tiny cute arms!)
+  // Arms
   ctx.fillStyle = '#EF5350';
   const armWave = Math.sin(t * 5) * 5;
-  ctx.beginPath();
-  ctx.ellipse(22, 5 + bob + armWave, 6, 10, -0.5, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(22, 5 + bob + armWave, 6, 10, -0.5, 0, Math.PI * 2); ctx.fill();
 
   // Head
   ctx.fillStyle = '#E53935';
-  ctx.beginPath();
-  ctx.ellipse(42, -8 + bob, 22, 20, 0.1, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(42, -8 + bob, 22, 20, 0.1, 0, Math.PI * 2); ctx.fill();
 
-  // Long snout (rounded, cute)
+  // Snout
   ctx.fillStyle = '#D32F2F';
-  ctx.beginPath();
-  ctx.ellipse(62, -4 + bob, 16, 10, 0.05, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Snout top
+  ctx.beginPath(); ctx.ellipse(62, -4 + bob, 16, 10, 0.05, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#EF5350';
-  ctx.beginPath();
-  ctx.ellipse(62, -8 + bob, 14, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(62, -8 + bob, 14, 6, 0, 0, Math.PI * 2); ctx.fill();
 
   // Cheeks
   ctx.fillStyle = 'rgba(255,100,150,0.35)';
-  ctx.beginPath();
-  ctx.ellipse(52, 2 + bob, 10, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(32, 2 + bob, 10, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(52, 2 + bob, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(32, 2 + bob, 10, 7, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Eye (big cute eye!)
+  // Eye
   ctx.fillStyle = '#FFF';
-  ctx.beginPath();
-  ctx.ellipse(44, -16 + bob, 11, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(44, -16 + bob, 11, 12, 0, 0, Math.PI * 2); ctx.fill();
   const blink = (Math.sin(t * 0.7 + 1) > 0.95) ? 0.15 : 1;
   ctx.fillStyle = '#1B0000';
-  ctx.beginPath();
-  ctx.ellipse(46, -16 + bob, 6, 8 * blink, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(46, -16 + bob, 6, 8 * blink, 0, 0, Math.PI * 2); ctx.fill();
   if (blink > 0.5) {
     ctx.fillStyle = '#FFF';
-    ctx.beginPath();
-    ctx.arc(48, -19 + bob, 3.5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(48, -19 + bob, 3.5, 0, Math.PI * 2); ctx.fill();
   }
 
   // Crest
   ctx.fillStyle = '#FF1744';
   ctx.beginPath();
-  ctx.moveTo(34, -28 + bob);
-  ctx.lineTo(30, -40 + bob);
-  ctx.lineTo(38, -26 + bob);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(34, -28 + bob); ctx.lineTo(30, -40 + bob); ctx.lineTo(38, -26 + bob);
+  ctx.closePath(); ctx.fill();
 
-  // Teeth (cute small ones)
+  // Teeth
   ctx.fillStyle = '#FFF';
   if (sp.state === 'happy' || sp.state === 'eat') {
     for (let i = 0; i < 3; i++) {
@@ -650,83 +648,60 @@ function drawCuteSpino(sp) {
       ctx.moveTo(56 + i * 6, 2 + bob);
       ctx.lineTo(58 + i * 6, 6 + bob);
       ctx.lineTo(60 + i * 6, 2 + bob);
-      ctx.closePath();
-      ctx.fill();
+      ctx.closePath(); ctx.fill();
     }
   }
 
   // Mouth
   if (sp.state === 'happy' || sp.state === 'eat') {
-    ctx.strokeStyle = '#B71C1C';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(60, 0 + bob, 8, 0.1, Math.PI - 0.1);
-    ctx.stroke();
+    ctx.strokeStyle = '#B71C1C'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(60, 0 + bob, 8, 0.1, Math.PI - 0.1); ctx.stroke();
   } else if (sp.state === 'roar') {
     ctx.fillStyle = '#B71C1C';
-    ctx.beginPath();
-    ctx.ellipse(65, 0 + bob, 8, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(65, 0 + bob, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#EF5350';
-    ctx.beginPath();
-    ctx.ellipse(65, 2 + bob, 5, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(65, 2 + bob, 5, 5, 0, 0, Math.PI * 2); ctx.fill();
   } else {
-    ctx.strokeStyle = '#B71C1C';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(60, -2 + bob, 5, 0.2, Math.PI - 0.2);
-    ctx.stroke();
+    ctx.strokeStyle = '#B71C1C'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(60, -2 + bob, 5, 0.2, Math.PI - 0.2); ctx.stroke();
   }
 
   // Roar effect
   if (sp.state === 'roar' && sp.stateTimer > 15) {
-    ctx.strokeStyle = 'rgba(255,23,68,0.4)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,23,68,0.4)'; ctx.lineWidth = 3;
     for (let i = 1; i <= 3; i++) {
-      ctx.beginPath();
-      ctx.arc(72, -2 + bob, 10 + i * 12, -0.5, 0.5);
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(72, -2 + bob, 10 + i * 12, -0.5, 0.5); ctx.stroke();
     }
   }
 
   ctx.restore();
 }
 
-// ============ DRAW FUNCTIONS ============
+// ============ DRAW HELPERS ============
 function drawStar(x, y, size, color, alpha, rot) {
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
+  ctx.translate(x, y); ctx.rotate(rot);
+  ctx.globalAlpha = alpha; ctx.fillStyle = color;
   ctx.beginPath();
   for (let i = 0; i < 5; i++) {
     const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-    const method = i === 0 ? 'moveTo' : 'lineTo';
-    ctx[method](Math.cos(angle) * size, Math.sin(angle) * size);
+    ctx[i === 0 ? 'moveTo' : 'lineTo'](Math.cos(angle) * size, Math.sin(angle) * size);
   }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  ctx.closePath(); ctx.fill(); ctx.restore();
 }
 
 function drawHeart(x, y, size, color, alpha) {
   ctx.save();
-  ctx.translate(x, y);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
+  ctx.translate(x, y); ctx.globalAlpha = alpha; ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(0, size * 0.3);
   ctx.bezierCurveTo(-size * 0.5, -size * 0.3, -size, size * 0.1, 0, size);
   ctx.bezierCurveTo(size, size * 0.1, size * 0.5, -size * 0.3, 0, size * 0.3);
-  ctx.fill();
-  ctx.restore();
+  ctx.fill(); ctx.restore();
 }
 
 // ============ BACKGROUND ============
 function drawBackground() {
-  // Sky gradient
   const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
   skyGrad.addColorStop(0, '#87CEEB');
   skyGrad.addColorStop(0.6, '#B2EBF2');
@@ -735,19 +710,12 @@ function drawBackground() {
   ctx.fillRect(0, 0, W, H);
 
   // Sun
-  const sunX = W * 0.85;
-  const sunY = H * 0.12;
+  const sunX = W * 0.88, sunY = H * 0.1;
   ctx.fillStyle = '#FFF9C4';
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, 50, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(sunX, sunY, 50, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#FFEE58';
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, 38, 0, Math.PI * 2);
-  ctx.fill();
-  // Sun rays
-  ctx.strokeStyle = '#FFF176';
-  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(sunX, sunY, 38, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#FFF176'; ctx.lineWidth = 3;
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2 + performance.now() * 0.0005;
     ctx.beginPath();
@@ -759,15 +727,10 @@ function drawBackground() {
   // Rainbow
   if (rainbowAlpha > 0.01) {
     const colors = ['#FF6B6B','#FFB347','#FFE66D','#6BCB77','#4ECDC4','#45B7D1','#C084FC'];
-    const rx = W * 0.5;
-    const ry = H * 0.55;
     ctx.globalAlpha = rainbowAlpha * 0.5;
     colors.forEach((c, i) => {
-      ctx.strokeStyle = c;
-      ctx.lineWidth = 12;
-      ctx.beginPath();
-      ctx.arc(rx, ry, 200 + i * 14, Math.PI, 0);
-      ctx.stroke();
+      ctx.strokeStyle = c; ctx.lineWidth = 14;
+      ctx.beginPath(); ctx.arc(W * 0.5, H * 0.55, 200 + i * 16, Math.PI, 0); ctx.stroke();
     });
     ctx.globalAlpha = 1;
   }
@@ -776,165 +739,138 @@ function drawBackground() {
   ctx.fillStyle = '#FFF';
   clouds.forEach(c => {
     ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.ellipse(c.x, c.y, c.w * 0.5, 25, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(c.x - c.w * 0.25, c.y + 5, c.w * 0.3, 20, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(c.x + c.w * 0.25, c.y + 5, c.w * 0.35, 22, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, c.w * 0.5, 25, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x - c.w * 0.25, c.y + 5, c.w * 0.3, 20, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x + c.w * 0.25, c.y + 5, c.w * 0.35, 22, 0, 0, Math.PI * 2); ctx.fill();
   });
   ctx.globalAlpha = 1;
 
   // Hills
   ctx.fillStyle = '#81C784';
-  ctx.beginPath();
-  ctx.moveTo(0, H * 0.8);
+  ctx.beginPath(); ctx.moveTo(0, H * 0.78);
   for (let x = 0; x <= W; x += 30) {
-    ctx.lineTo(x, H * 0.8 - Math.sin(x * 0.005) * 30 - Math.sin(x * 0.012) * 15);
+    ctx.lineTo(x, H * 0.78 - Math.sin(x * 0.005) * 30 - Math.sin(x * 0.012) * 15);
   }
-  ctx.lineTo(W, H);
-  ctx.lineTo(0, H);
-  ctx.closePath();
-  ctx.fill();
+  ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
 
   // Ground
   ctx.fillStyle = '#66BB6A';
-  ctx.fillRect(0, H * 0.8, W, H * 0.2);
+  ctx.fillRect(0, H * 0.78, W, H * 0.22);
 
-  // Grass tufts
+  // Grass
   ctx.fillStyle = '#4CAF50';
-  for (let x = 10; x < W; x += 40 + Math.sin(x) * 15) {
-    const gh = 8 + Math.sin(x * 0.1) * 4;
+  for (let x = 10; x < W; x += 35 + Math.sin(x) * 12) {
+    const gh = 10 + Math.sin(x * 0.1) * 5;
     ctx.beginPath();
-    ctx.moveTo(x - 5, H * 0.8);
-    ctx.lineTo(x, H * 0.8 - gh);
-    ctx.lineTo(x + 5, H * 0.8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(x + 2, H * 0.8);
-    ctx.lineTo(x + 8, H * 0.8 - gh * 0.7);
-    ctx.lineTo(x + 12, H * 0.8);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(x - 6, H * 0.78); ctx.lineTo(x, H * 0.78 - gh); ctx.lineTo(x + 6, H * 0.78);
+    ctx.closePath(); ctx.fill();
   }
 
   // Flowers
   const flowerColors = ['#FF69B4','#FFE66D','#C084FC','#67E8F9','#FF6B6B'];
-  for (let x = 30; x < W; x += 80 + Math.sin(x * 0.3) * 30) {
-    const fy = H * 0.8 + 10 + Math.sin(x) * 8;
+  for (let x = 30; x < W; x += 70 + Math.sin(x * 0.3) * 25) {
+    const fy = H * 0.78 + 12 + Math.sin(x) * 8;
     const fc = flowerColors[Math.floor(x * 0.1) % flowerColors.length];
-    // stem
-    ctx.strokeStyle = '#388E3C';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x, fy);
-    ctx.lineTo(x, fy - 15);
-    ctx.stroke();
-    // petals
+    ctx.strokeStyle = '#388E3C'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, fy); ctx.lineTo(x, fy - 15); ctx.stroke();
     ctx.fillStyle = fc;
     for (let p = 0; p < 5; p++) {
       const pa = (p / 5) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(x + Math.cos(pa) * 5, fy - 15 + Math.sin(pa) * 5, 4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x + Math.cos(pa) * 5, fy - 15 + Math.sin(pa) * 5, 4, 0, Math.PI * 2); ctx.fill();
     }
     ctx.fillStyle = '#FFE082';
-    ctx.beginPath();
-    ctx.arc(x, fy - 15, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(x, fy - 15, 3, 0, Math.PI * 2); ctx.fill();
   }
 }
 
-// ============ HIT TEST ============
+// ============ HIT TEST (bigger for tablet!) ============
 function hitTest(mx, my, char) {
   const dx = mx - char.x;
   const dy = my - char.y;
-  const r = 60 * char.baseScale;
+  const r = 85 * char.baseScale; // much bigger tap target
   return dx * dx + dy * dy < r * r;
 }
 
-// ============ INPUT ============
+// ============ FEED DINO (dino walks to food) ============
+function feedDino(dino, food) {
+  dino.eatTarget = food;
+  dino.facing = food.x > dino.x ? 1 : -1;
+  setCharState(dino, 'walking', 200);
+}
+
+function dinoEatFood(dino, food) {
+  setCharState(dino, 'eat', 45);
+  spawnHearts(dino.x, dino.y - 50 * dino.baseScale, 6);
+  spawnStars(food.x, food.y, 10);
+  dino.squish = 1.3;
+  dino.fatness = Math.min(dino.fatness + 0.3, 3.0);
+  dino.eatTarget = null;
+  playSound('eat');
+  playSound('happy');
+}
+
+// ============ INPUT (multi-touch!) ============
 function handleTap(mx, my) {
   if (audioCtx.state === 'suspended') audioCtx.resume();
 
-  const hitDragon = hitTest(mx, my, dragon);
-  const hitSpino = hitTest(mx, my, spino);
+  const hitDragonArea = hitTest(mx, my, dragon);
+  const hitSpinoArea = hitTest(mx, my, spino);
 
-  // Check food tap
+  // Check food tap - bigger hit area for tablets
   let hitFood = false;
-  foods = foods.filter(f => {
+  foods.forEach(f => {
+    if (f._eaten) return;
     const dx = mx - f.x;
     const dy = my - f.y;
-    const hitRadius = f.size * 1.5;
+    const hitRadius = f.size * 2; // very generous tap area!
     if (dx * dx + dy * dy < (hitRadius * hitRadius)) {
       hitFood = true;
-      // Find nearest dino
+      f._eaten = true;
+      // Find nearest dino and send it to eat
       const dd = Math.hypot(f.x - dragon.x, f.y - dragon.y);
       const ds = Math.hypot(f.x - spino.x, f.y - spino.y);
       if (dd < ds) {
-        setCharState(dragon, 'eat', 40);
-        spawnHearts(dragon.x, dragon.y - 50 * dragon.baseScale, 5);
-        dragon.squish = 1.3;
-        dragon.fatness = Math.min(dragon.fatness + 0.3, 3.0);
+        feedDino(dragon, f);
       } else {
-        setCharState(spino, 'eat', 40);
-        spawnHearts(spino.x, spino.y - 50 * spino.baseScale, 5);
-        spino.squish = 1.3;
-        spino.fatness = Math.min(spino.fatness + 0.3, 3.0);
+        feedDino(spino, f);
       }
-      spawnStars(f.x, f.y, 8);
-      playSound('eat');
-      playSound('happy');
-      return false;
     }
-    return true;
   });
   if (hitFood) return;
 
-  if (hitDragon) {
-    // Dragon tapped! Breathe fire!
+  if (hitDragonArea) {
     setCharState(dragon, 'fire', 50);
     dragon.squish = 1.3;
-    spawnFire(dragon.x + dragon.facing * 80 * dragon.baseScale, dragon.y - 10, dragon.facing, 20);
-    spawnStars(dragon.x, dragon.y - 40 * dragon.baseScale, 6);
+    spawnFire(dragon.x + dragon.facing * 80 * dragon.baseScale, dragon.y - 10, dragon.facing, 25);
+    spawnStars(dragon.x, dragon.y - 40 * dragon.baseScale, 8);
     playSound('fire');
     playSound('happy');
     rainbowTimer = 120;
-  } else if (hitSpino) {
-    // Spino tapped! Roar!
+  } else if (hitSpinoArea) {
     setCharState(spino, 'roar', 45);
     spino.squish = 1.3;
-    spawnConfetti(spino.x, spino.y - 30 * spino.baseScale, 25);
-    spawnStars(spino.x, spino.y - 60 * spino.baseScale, 8);
+    spawnConfetti(spino.x, spino.y - 30 * spino.baseScale, 30);
+    spawnStars(spino.x, spino.y - 60 * spino.baseScale, 10);
     playSound('roar');
     playSound('bounce');
     rainbowTimer = 120;
   } else {
-    // Tap on background - colorful effects!
+    // Background tap
     const effectType = Math.floor(Math.random() * 4);
-    if (effectType === 0) spawnStars(mx, my, 10);
-    else if (effectType === 1) spawnHearts(mx, my, 8);
-    else if (effectType === 2) spawnBubbles(mx, my, 10);
-    else spawnConfetti(mx, my, 15);
+    if (effectType === 0) spawnStars(mx, my, 12);
+    else if (effectType === 1) spawnHearts(mx, my, 10);
+    else if (effectType === 2) spawnBubbles(mx, my, 12);
+    else spawnConfetti(mx, my, 18);
     playSound('pop');
 
-    // Floating emoji
     const emojis = ['⭐','🌟','💖','🦋','🌈','✨','🎵','🎶','🌸','🍀'];
     floatingEmojis.push({
-      x: mx, y: my,
-      vy: -2 - Math.random() * 2,
+      x: mx, y: my, vy: -2 - Math.random() * 2,
       emoji: emojis[Math.floor(Math.random() * emojis.length)],
-      size: 30 + Math.random() * 20,
-      life: 80,
-      maxLife: 80,
-      rot: (Math.random() - 0.5) * 0.5
+      size: 35 + Math.random() * 25,
+      life: 80, maxLife: 80
     });
 
-    // Make both dinos look at click and get happy
     if (dragon.state === 'idle' || dragon.state === 'walking') {
       dragon.facing = mx > dragon.x ? 1 : -1;
       setCharState(dragon, 'happy', 30);
@@ -946,7 +882,21 @@ function handleTap(mx, my) {
   }
 }
 
-canvas.addEventListener('pointerdown', e => {
+// Multi-touch support! Each finger triggers independently
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    handleTap((t.clientX - rect.left) * scaleX, (t.clientY - rect.top) * scaleY);
+  }
+}, { passive: false });
+
+// Also support mouse (for testing on PC)
+canvas.addEventListener('mousedown', e => {
   const rect = canvas.getBoundingClientRect();
   const scaleX = W / rect.width;
   const scaleY = H / rect.height;
@@ -955,8 +905,6 @@ canvas.addEventListener('pointerdown', e => {
 
 // ============ UPDATE ============
 function update() {
-  const dt = 1;
-
   // Clouds
   clouds.forEach(c => {
     c.x += c.speed;
@@ -971,36 +919,51 @@ function update() {
     rainbowAlpha *= 0.97;
   }
 
-  // Food spawning
+  // Food spawning (frequent for tablet play!)
   foodTimer++;
-  if (foodTimer > 100 && foods.length < 5) {
+  if (foodTimer > 80 && foods.length < 6) {
     spawnFood();
     foodTimer = 0;
   }
 
   // Food falling
-  const groundY = H * 0.8 - 20;
+  const groundY = H * 0.78 - 25;
   foods = foods.filter(f => {
     if (f.y < groundY) {
       f.y += f.vy;
       f.rot += f.rotSpeed;
     } else {
       f.y = groundY;
-      f.bounce = Math.sin(performance.now() * 0.003) * 3;
+      f.bounce = Math.sin(performance.now() * 0.003) * 4;
     }
+    f.glow = (Math.sin(performance.now() * 0.005 + f.x) + 1) * 0.5;
     return f.y < H + 50;
   });
 
   // Update characters
   [dragon, spino].forEach(ch => {
     ch.animTime += 0.05;
-
-    // Squish recovery
     ch.squish += (1 - ch.squish) * 0.1;
 
-    // Very slowly slim down over time (but never below 1)
     if (ch.fatness > 1) {
       ch.fatness = Math.max(1, ch.fatness - 0.0002);
+    }
+
+    // Walking to eat food
+    if (ch.eatTarget) {
+      const food = ch.eatTarget;
+      const dx = food.x - ch.x;
+      if (Math.abs(dx) < 30) {
+        // Arrived! Eat it!
+        dinoEatFood(ch, food);
+        // Remove the food
+        foods = foods.filter(f => f !== food);
+      } else {
+        // Walk toward food
+        ch.x += Math.sign(dx) * 3;
+        ch.facing = dx > 0 ? 1 : -1;
+        ch.state = 'walking';
+      }
     }
 
     // State timer
@@ -1008,19 +971,20 @@ function update() {
       ch.stateTimer--;
       if (ch.stateTimer <= 0) {
         ch.state = 'idle';
+        ch.eatTarget = null;
       }
     }
 
-    // Auto movement (wander around)
+    // Auto wander
     ch.moveTimer--;
-    if (ch.moveTimer <= 0 && (ch.state === 'idle' || ch.state === 'walking')) {
-      ch.moveTimer = 100 + Math.random() * 200;
-      ch.targetX = 100 + Math.random() * (W - 200);
+    if (ch.moveTimer <= 0 && (ch.state === 'idle') && !ch.eatTarget) {
+      ch.moveTimer = 120 + Math.random() * 200;
+      ch.targetX = 80 + Math.random() * (W - 160);
       setCharState(ch, 'walking', ch.moveTimer);
     }
 
-    // Move toward target (slower when fat!)
-    if (ch.state === 'walking') {
+    // Move toward wander target (not food)
+    if (ch.state === 'walking' && !ch.eatTarget) {
       const dx = ch.targetX - ch.x;
       const walkSpeed = 0.015 / ch.fatness;
       if (Math.abs(dx) > 5) {
@@ -1039,13 +1003,13 @@ function update() {
       ch.jumpVy = 0;
     }
 
-    // Random jump
+    // Random happy jump
     if (ch.state === 'happy' && Math.random() < 0.05 && ch.y >= ch.baseY) {
       ch.jumpVy = -8;
       playSound('bounce');
     }
 
-    // Scale bounce for eat/fire/roar
+    // Scale bounce
     if (ch.state === 'fire' || ch.state === 'roar' || ch.state === 'eat') {
       ch.scale = 1 + Math.sin(ch.animTime * 8) * 0.05;
     } else if (ch.state === 'happy') {
@@ -1053,44 +1017,51 @@ function update() {
     } else {
       ch.scale += (1 - ch.scale) * 0.1;
     }
+
+    // Keep in bounds
+    ch.x = Math.max(60, Math.min(W - 60, ch.x));
   });
 
-  // Continuous fire particles when dragon is breathing
+  // Fire particles
   if (dragon.state === 'fire' && dragon.stateTimer > 5) {
-    spawnFire(
-      dragon.x + dragon.facing * 70 * dragon.baseScale,
-      dragon.y - 10 * dragon.baseScale,
-      dragon.facing, 3
-    );
+    spawnFire(dragon.x + dragon.facing * 70 * dragon.baseScale, dragon.y - 10 * dragon.baseScale, dragon.facing, 3);
   }
 
   // Particles
   particles = particles.filter(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.08;
-    p.vx *= 0.99;
-    p.rot += p.rotSpeed;
-    p.life--;
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.08; p.vx *= 0.99;
+    p.rot += p.rotSpeed; p.life--;
     return p.life > 0;
   });
 
   // Floating emojis
   floatingEmojis = floatingEmojis.filter(e => {
-    e.y += e.vy;
-    e.life--;
+    e.y += e.vy; e.life--;
     return e.life > 0;
   });
+
+  // Auto-remove eaten-flagged food that dino didn't reach in time
+  foods = foods.filter(f => !f._eaten || [dragon, spino].some(ch => ch.eatTarget === f));
 }
 
 // ============ DRAW ============
 function draw() {
   drawBackground();
 
-  // Foods
+  // Foods with glow ring to attract tapping
   foods.forEach(f => {
     ctx.save();
     ctx.translate(f.x, f.y + (f.bounce || 0));
+
+    // Glowing ring around food
+    const glowSize = f.size * 0.8 + f.glow * 8;
+    ctx.globalAlpha = 0.2 + f.glow * 0.2;
+    ctx.strokeStyle = '#FFD93D';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, glowSize, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+
     ctx.rotate(f.rot);
     ctx.font = `${f.size}px Arial`;
     ctx.textAlign = 'center';
@@ -1099,7 +1070,7 @@ function draw() {
     ctx.restore();
   });
 
-  // Draw characters (draw the one further back first)
+  // Characters
   if (dragon.y <= spino.y) {
     drawCuteDragon(dragon);
     drawCuteSpino(spino);
@@ -1117,31 +1088,19 @@ function draw() {
       drawHeart(p.x, p.y, p.size * alpha, p.color, alpha);
     } else if (p.type === 'bubble') {
       ctx.globalAlpha = alpha * 0.6;
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (0.5 + alpha * 0.5), 0, Math.PI * 2);
-      ctx.stroke();
-      // Shine
-      ctx.fillStyle = '#FFF';
-      ctx.globalAlpha = alpha * 0.4;
-      ctx.beginPath();
-      ctx.arc(p.x - p.size * 0.2, p.y - p.size * 0.2, p.size * 0.15, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.strokeStyle = p.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + alpha * 0.5), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#FFF'; ctx.globalAlpha = alpha * 0.4;
+      ctx.beginPath(); ctx.arc(p.x - p.size * 0.2, p.y - p.size * 0.2, p.size * 0.15, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     } else if (p.type === 'circle') {
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (0.3 + alpha * 0.7), 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalAlpha = alpha; ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.3 + alpha * 0.7), 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     } else if (p.type === 'rect') {
       ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot);
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.globalAlpha = alpha; ctx.fillStyle = p.color;
       ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
       ctx.restore();
     }
@@ -1159,9 +1118,9 @@ function draw() {
     ctx.restore();
   });
 
-  // Title (gentle, at top)
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.font = `bold ${Math.min(W * 0.04, 36)}px Arial`;
+  // Title
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = `bold ${Math.min(W * 0.035, 32)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText('點點看！🐉🦖', W / 2, 15);
@@ -1173,7 +1132,6 @@ function loop() {
   draw();
   requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 </body>
